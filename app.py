@@ -60,12 +60,14 @@ def analizza_foto(image_bytes):
             messages=[{"role": "user", "content": [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_base64}}]}]
         )
         text = message.content[0].text.strip()
+        st.code(text)
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].strip()
         return json.loads(text)
-    except:
+    except Exception as e:
+        st.error(f"Errore: {e}")
         return None
 
 st.subheader("📸 Carica foto scontrino")
