@@ -73,7 +73,7 @@ st.subheader("📸 Carica foto scontrino")
 uploaded_file = st.file_uploader("Seleziona foto dello scontrino", type=["jpg", "jpeg", "png"])
 
 if uploaded_file and st.button("🔍 Analizza e salva spesa"):
-    with st.spinner("Claude sta analizzando lo scontrino..."):
+    with st.spinner("Sto analizzando lo scontrino..."):
         parsed = analizza_foto(uploaded_file.getvalue())
         if parsed and parsed.get("importo"):
             conn.execute("""INSERT INTO spese (user_id, data, importo, negozio, categoria, motivo, nota)
