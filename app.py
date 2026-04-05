@@ -4,26 +4,11 @@ import json
 import hashlib
 from anthropic import Anthropic
 import os
-import sqlite3
-import tempfile, pathlib
 from datetime import datetime
+from supabase import create_client
 
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-
-DB_PATH = pathlib.Path(tempfile.gettempdir()) / "coach_spese.db"
-conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-
-conn.execute('''CREATE TABLE IF NOT EXISTS spese 
-                (id INTEGER PRIMARY KEY, user_id INTEGER, data TEXT, importo REAL, 
-                 negozio TEXT, categoria TEXT, motivo TEXT, nota TEXT)''')
-
-conn.execute('''CREATE TABLE IF NOT EXISTS users 
-                (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, 
-                 is_premium INTEGER DEFAULT 0)''')
-
-test_hash = hashlib.sha256("1234".encode()).hexdigest()
-conn.execute("INSERT OR IGNORE INTO users (username, password_hash, is_premium) VALUES ('test', ?, 1)", (test_hash,))
-conn.commit()
+supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
 st.set_page_config(page_title="Coach Spese AI", page_icon="💸")
 st.title("💸 Coach Spese AI")
@@ -34,11 +19,11 @@ if 'user_id' not in st.session_state:
     password = st.text_input("Password", type="password")
     if st.button("Accedi"):
         pw_hash = hashlib.sha256(password.encode()).hexdigest()
-        user = conn.execute("SELECT id, is_premium FROM users WHERE username=? AND password_hash=?", 
-                           (username, pw_hash)).fetchone()
-        if user:
-            st.session_state.user_id = user[0]
-            st.session_state.is_premium = bool(user[1])
+        result = supabase.table("users").select("*").eq("username", username).eq("password_hash", pw_hash).execute()
+        if result.data:
+            user = result.data[0]
+            st.session_state.user_id = user["id"]
+            st.session_state.is_premium = user["is_premium"]
             st.session_state.username = username
             st.rerun()
         else:
@@ -76,16 +61,17 @@ if uploaded_file and st.button("🔍 Analizza e salva spesa"):
     with st.spinner("Sto analizzando lo scontrino..."):
         parsed = analizza_foto(uploaded_file.getvalue())
         if parsed and parsed.get("importo"):
-            conn.execute("""INSERT INTO spese (user_id, data, importo, negozio, categoria, motivo, nota)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                         (st.session_state.user_id, parsed.get("data", datetime.now().strftime("%Y-%m-%d")), 
-                          parsed.get("importo"), parsed.get("negozio", "Sconosciuto"), 
-                          parsed.get("categoria", "Altro"), "", parsed.get("consiglio", "")))
-            conn.commit()
+            supabase.table("spese").insert({
+                "user_id": st.session_state.user_id,
+                "data": parsed.get("data", datetime.now().strftime("%Y-%m-%d")),
+                "importo": parsed.get("importo"),
+                "negozio": parsed.get("negozio", "Sconosciuto"),
+                "categoria": parsed.get("categoria", "Altro"),
+                "motivo": "",
+                "nota": parsed.get("consiglio", "")
+            }).execute()
             st.success(f"✅ Salvata: €{parsed.get('importo')} da {parsed.get('negozio')}")
             st.write("**Consiglio:**", parsed.get("consiglio", "Continua così!"))
-        else:
-            st.error("Non ho capito bene la foto. Prova con una più chiara o luminosa.")
 
 st.info("**Test rapido**: username = `test`    password = `1234`")
 st.caption("Coach Spese AI • Creato da Terminale")
