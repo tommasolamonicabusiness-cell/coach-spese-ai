@@ -297,12 +297,43 @@ elif st.session_state.page == "grafici":
 elif st.session_state.page == "profilo":
     st.title("Profilo")
     st.write(f"**Username:** {st.session_state.username}")
-    st.write(f"**Piano:** {'Premium' if st.session_state.is_premium else 'Gratuito'}")
-    if not st.session_state.is_premium:
+    st.write(f"**Piano:** {'Premium ✓' if st.session_state.is_premium else 'Gratuito'}")
+
+    if st.session_state.is_premium:
+        st.divider()
+        st.subheader("Automazione Apple Pay")
+        st.write("Ogni pagamento Apple Pay viene registrato automaticamente.")
+
+        # Recupera api_key da Supabase
+        result = supabase.table("users").select("api_key").eq("id", st.session_state.user_id).execute()
+        api_key = result.data[0]["api_key"] if result.data else ""
+
+        st.code(api_key, language=None)
+        st.caption("Questa è la tua chiave personale. Non condividerla con nessuno.")
+
+        st.divider()
+        st.subheader("Come installare lo shortcut")
+        st.write("1. Apri l'app **Comandi** sul tuo iPhone")
+        st.write("2. Vai su **Automazioni** → **Nuova automazione**")
+        st.write("3. Scegli **Transazione** come trigger")
+        st.write("4. Seleziona **Qualsiasi transazione**")
+        st.write("5. Aggiungi l'azione **Ottieni testo da input**")
+        st.write("6. Aggiungi l'azione **URL** con questo indirizzo:")
+        st.code("https://coach-spese-api-production.up.railway.app/api/spesa", language=None)
+        st.write("7. Aggiungi l'azione **Ottieni contenuti URL** con:")
+        st.write("   - Metodo: **POST**")
+        st.write("   - Header: `x-api-key` → incolla la tua chiave sopra")
+        st.write("   - Body JSON:")
+        st.code('{"importo": [importo transazione], "negozio": [nome esercente], "categoria": "Altro"}', language=None)
+        st.write("8. Disattiva **Chiedi prima di eseguire**")
+        st.success("Fatto! Ogni pagamento Apple Pay verrà salvato automaticamente.")
+
+    else:
         st.divider()
         st.subheader("Passa a Premium")
-        st.write("Grafici illimitati e molto altro.")
+        st.write("Sblocca grafici illimitati e l'automazione Apple Pay.")
         st.button("Scopri Premium", use_container_width=True)
+
     st.divider()
     if st.button("Esci", use_container_width=True):
         for key in list(st.session_state.keys()):
