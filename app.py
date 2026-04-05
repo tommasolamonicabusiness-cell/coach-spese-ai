@@ -1,21 +1,17 @@
 import streamlit as st
 import base64
 import json
-import random
 import hashlib
 from anthropic import Anthropic
-from dotenv import load_dotenv
 import os
 import sqlite3
-from datetime import datetime, date
-import pandas as pd
-import plotly.express as px
+import tempfile, pathlib
+from datetime import datetime
 
-load_dotenv()
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-# Database
-conn = sqlite3.connect('coach_spese.db', check_same_thread=False)
+DB_PATH = pathlib.Path(tempfile.gettempdir()) / "coach_spese.db"
+conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
 
 conn.execute('''CREATE TABLE IF NOT EXISTS spese 
                 (id INTEGER PRIMARY KEY, user_id INTEGER, data TEXT, importo REAL, 
@@ -25,7 +21,6 @@ conn.execute('''CREATE TABLE IF NOT EXISTS users
                 (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, 
                  is_premium INTEGER DEFAULT 0)''')
 
-# Utente test (test / 1234)
 test_hash = hashlib.sha256("1234".encode()).hexdigest()
 conn.execute("INSERT OR IGNORE INTO users (username, password_hash, is_premium) VALUES ('test', ?, 1)", (test_hash,))
 conn.commit()
@@ -34,7 +29,6 @@ st.set_page_config(page_title="Coach Spese AI", page_icon="💸")
 st.title("💸 Coach Spese AI")
 st.caption("Versione test con login")
 
-# Login
 if 'user_id' not in st.session_state:
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -53,7 +47,6 @@ if 'user_id' not in st.session_state:
 
 st.sidebar.success(f"👤 {st.session_state.username} — {'Premium ✅' if st.session_state.is_premium else 'Free'}")
 
-# System Prompt semplificato
 SYSTEM_PROMPT = """Analizza la foto di uno scontrino e restituisci SOLO un JSON valido con questi campi:
 {"importo": numero, "data": "YYYY-MM-DD", "negozio": "nome", "categoria": "Cibo|Trasporti|Casa|Svago|Altro", "consiglio": "testo breve"}"""
 
@@ -71,12 +64,10 @@ def analizza_foto(image_bytes):
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].strip()
-        data = json.loads(text)
-        return data
+        return json.loads(text)
     except:
         return None
 
-# Interfaccia principale
 st.subheader("📸 Carica foto scontrino")
 uploaded_file = st.file_uploader("Seleziona foto dello scontrino", type=["jpg", "jpeg", "png"])
 
@@ -96,5 +87,4 @@ if uploaded_file and st.button("🔍 Analizza e salva spesa"):
             st.error("Non ho capito bene la foto. Prova con una più chiara o luminosa.")
 
 st.info("**Test rapido**: username = `test`    password = `1234`")
-
 st.caption("Coach Spese AI • Creato da Terminale")
